@@ -55,7 +55,7 @@ class CentralRecognition() :
         self.diff = self.diff.astype(np.uint8)
         cv2.imwrite(os.path.join(self.__DIF_DIR, self.VIDEO_NAME + self.__IMG_EXT), self.diff) 
 
-        #差分を２値化
+        #差分を二値化
         ret, self.diff = cv2.threshold(self.diff, 0, 255, cv2.THRESH_OTSU)
 
         #カメラの枠外を除去

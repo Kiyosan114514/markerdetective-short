@@ -1,6 +1,7 @@
 import picamera
 import os
 from time import sleep
+import time
 import sys
 import cv2
 import picamera.array
@@ -26,9 +27,9 @@ class Video() :
 
     def capture(self, VIDEO_NAME : str) :
         #室内
-        self.cap.shutter_speed = 10000
+        #self.cap.shutter_speed = 10000
         #defo
-        #self.cap.shutter_speed = 100
+        self.cap.shutter_speed = 100
         #少し暗め
         #self.cap.shutter_speed = 50
         #iphoneぐらい
