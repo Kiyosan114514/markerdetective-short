@@ -10,6 +10,7 @@ class FrameDivision :
         # Read Video
         cap = cv2.VideoCapture(os.path.join(self.__VIDEO_DIR, STEP + self.__VIDEO_EXT))
         #cap = cv2.VideoCapture('/home/pi/marker/video/new-test14-max.h264')
+        #aaaaaaaaaa
 
         # Counter
         counter = 0
