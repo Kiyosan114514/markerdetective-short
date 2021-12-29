@@ -8,8 +8,8 @@ class FrameDivision :
     def Frame_Division(self, STEP : str) :
 
         # Read Video
-        #cap = cv2.VideoCapture(os.path.join(self.__VIDEO_DIR, STEP + self.__VIDEO_EXT))
-        cap = cv2.VideoCapture('/home/pi/marker/video/new-test14-max.h264')
+        cap = cv2.VideoCapture(os.path.join(self.__VIDEO_DIR, STEP + self.__VIDEO_EXT))
+        #cap = cv2.VideoCapture('/home/pi/marker/video/new-test14-max.h264')
 
         # Counter
         counter = 0
