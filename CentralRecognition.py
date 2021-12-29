@@ -110,6 +110,7 @@ class CentralRecognition() :
         # 最大値を取得(探査用)
         self.output[self.output.max() > self.output] = 0
         self.output[self.output.max() <= self.output] = 255
+        #aaaaaaaa
 
         # 判別分析法(Debug用)
         #ret, self.output = cv2.threshold(self.output, 0, 255, cv2.THRESH_OTSU)
