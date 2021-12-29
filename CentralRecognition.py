@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+ #-*- coding:utf-8 -*-
 import cv2
 import numpy as np
 import os
@@ -11,6 +11,9 @@ from FrameDivision import FrameDivision
 class CentralRecognition() :
 
     __OUTPUT_DIR = 'output/'
+    __FFT_DIR = 'fft/'
+    __DIF_DIR = 'dif/'
+    __DIFF_DIR = 'diff/'
     __IMG_EXT = '.png'
 
     __N = 32
@@ -24,86 +27,110 @@ class CentralRecognition() :
         if not os.path.exists(self.__OUTPUT_DIR) :
             os.makedirs(self.__OUTPUT_DIR)
 
-    def getFrames(self) :
+    #映像をフレーム分割
+    def __getFrames(self) :
         self.frames = self.frame_divider.Frame_Division(self.VIDEO_NAME)
-        self.frames2gray_img()
 
-    def frames2gray_img(self) :
-        self.img1 = np.array([cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames])
-        self.output = np.zeros((self.img1.shape[1], self.img1.shape[2]), dtype=np.uint8)
-        self.different()
-    
+    #グレースケール化
+    def __frames2gray_img(self) :
+        self.img = np.array([cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames])
+
+    #差分の抽出
     def different(self):
-        self.diff = np.zeros((self.img1.shape[1], self.img1.shape[2]), dtype=np.uint8)
+        self.diff = np.zeros((self.img.shape[1], self.img.shape[2]), dtype=np.uint32)
         i=0
         for frame in self.frames:
             if i==31:
                 break
-            self.bef = self.img1[i, :, :]
-            self.aft = self.img1[i+1, : ,:]
+            self.bef = self.img[i, :, :]
+            self.aft = self.img[i+1, : ,:]
+            self.bef = cv2.equalizeHist(self.bef)
+            self.aft = cv2.equalizeHist(self.aft)
             self.diff_frame = cv2.absdiff(self.bef, self.aft)
-            ret, diff_bin = cv2.threshold(self.diff_frame, 100, 255, 0)
-            #cv2.imwrite('/home/pi/marker/dif/pic'+str(i)+'.png', diff_bin)
-            self.diff=self.diff+diff_bin
+            self.diff=self.diff+self.diff_frame
             i=i+1
+        
+        #差分を正規化
+        self.diff = (self.diff/self.diff.max())*255
+        self.diff = self.diff.astype(np.uint8)
+        cv2.imwrite(os.path.join(self.__DIF_DIR, self.VIDEO_NAME + self.__IMG_EXT), self.diff) 
 
-        a=np.where(self.diff>200)
-        cv2.imwrite('/home/pi/marker/dif/diff-test3.png',self.diff)
+        #差分を２値化
+        ret, self.diff = cv2.threshold(self.diff, 0, 255, cv2.THRESH_OTSU)
 
-        self.xfM = (np.amax(a[1])).astype(np.uint32)
-        self.xfm = (np.amin(a[1])).astype(np.uint32)
-        self.yfM = (np.amax(a[0])).astype(np.uint32)
-        self.yfm = (np.amin(a[0])).astype(np.uint32)
+        #カメラの枠外を除去
+        self.mask = np.zeros((self.img.shape[1], self.img.shape[2]), dtype=np.uint8)
+        cv2.circle(self.mask, center=(self.img.shape[2] // 2, self.img.shape[1] // 2), radius=self.img.shape[1]//2, color=255, thickness=-1)
+        self.diff[self.mask == 0] = 0
 
-        self.f_frames = np.array([frame[ self.yfm-30 : self.yfM+30 , self.xfm-30 : self.xfM+30 ]for frame in self.frames])
-        self.img = np.array([cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.f_frames])
-        self.window_func()
+        cv2.imwrite(os.path.join(self.__DIFF_DIR, self.VIDEO_NAME + self.__IMG_EXT), self.diff)
 
-    def window_func(self) :
+    #窓関数に入れる
+    def __window_func(self) :
         self.img = self.img.transpose(1, 2, 0)
-        self.img = self.img * self.__win
+        #差分部分を切り取り
+        self.masked_img = self.img[self.diff == 255]
+        print(self.masked_img.shape)
         self.img = self.img.transpose(2, 0, 1)
-        self.acf = 1/(self.__win.sum()/self.__N)
-        self.fft()
+        self.masked_img = self.masked_img * self.__win     
+        self.acf = 1/(self.__win.sum()/ self.__N)
+        self.masked_img = self.masked_img.transpose(1,0)
 
-    def fft(self) :
-        self.fft_signal = np.fft.fft(self.img, axis=0)
-        self.bpf()
+    #FFT
+    def __fft(self) :
+        self.fft_signal = np.fft.fft(self.masked_img, axis=0)
 
-    def bpf(self) :
+    #BPF
+    def __bpf(self) :
         if self.MARKER_COLOR == 'Green' :
             self.filter_ = np.logical_and(self.__freq < 5.3, self.__freq > 4.8)
         elif self.MARKER_COLOR == 'Red' :
             self.filter_ = np.logical_and(self.__freq < 7.8, self.__freq > 6.8)
+        elif self.MARKER_COLOR == 'Blue' :
+            self.filter_ = np.logical_and(self.__freq < 12.5, self.__freq > 11.6)
         self.fft_signal_filtered = self.fft_signal[self.filter_]
-        self.normalize()
 
-    def normalize(self) :
+    #正規化
+    def __normalize(self) :
         self.fft_signal_filtered_amp = self.acf * np.abs(self.fft_signal_filtered)
         self.fft_signal_filtered_amp = self.fft_signal_filtered_amp / (self.__N / 2)
-        self.fft_signal_filtered_amp[0, :, :] /= 2
-        self.amp2pixel_value()
+        self.fft_signal_filtered_amp[0, :] /= 2
 
-    def amp2pixel_value(self) :
-        self.output_diff = np.max(self.fft_signal_filtered_amp, axis=0).astype(np.uint8)
-        self.binarization()
+    #FFTした結果を画像に変換
+    def __amp2pixel_value(self) :
+        self.output = np.zeros_like(self.img[:1])
+        self.output = self.output.transpose(1,2,0)
+        self.output[self.diff == 255] = self.fft_signal_filtered_amp.transpose(1,0)
+        self.output = self.output.transpose(2,0,1)
+        self.output = np.max(self.output, axis=0).astype(np.uint8)
+        cv2.imwrite(os.path.join(self.__FFT_DIR, self.VIDEO_NAME + self.__IMG_EXT), self.output)
 
-    def binarization(self) :
-        self.output_diff[self.output_diff.max() > self.output_diff] = 0
-        self.output_diff[self.output_diff.max() <= self.output_diff] = 255
-        self.output_result()
+    #二値化
+    def __binarization(self) :
+        # 最大値を取得(探査用)
+        self.output[self.output.max() > self.output] = 0
+        self.output[self.output.max() <= self.output] = 255
 
-    def output_result(self) :
-        y_offset = self.yfm-30
-        x_offset = self.xfm-30
-        self.output[y_offset:y_offset+self.output_diff.shape[0], x_offset:x_offset+self.output_diff.shape[1]] = self.output_diff
+        # 判別分析法(Debug用)
+        #ret, self.output = cv2.threshold(self.output, 0, 255, cv2.THRESH_OTSU)
+
+    def __output_result(self) :
         self.output = cv2.resize(self.output, (3280, 2464))
         cv2.imwrite(os.path.join(self.__OUTPUT_DIR, self.VIDEO_NAME + self.__IMG_EXT), self.output)
 
     def central_recognition(self, VIDEO_NAME : str, MARKER_COLOR : str) :
         self.VIDEO_NAME = VIDEO_NAME
         self.MARKER_COLOR = MARKER_COLOR
-        self.getFrames()
+        self.__getFrames()
+        self.__frames2gray_img()
+        self.different()
+        self.__window_func()
+        self.__fft()
+        self.__bpf()
+        self.__normalize()
+        self.__amp2pixel_value()
+        self.__binarization()
+        self.__output_result()
         return self.output
 
     def __del__(self):
