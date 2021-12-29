@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+import time
 
 class Calc():
 
@@ -92,6 +93,7 @@ class Calc():
 
     def get_distance_and_phi(self, result, VIDEO_NAME) :
         self.error = 0
+        self.t3 = time.time()
         self.VIDEO_NAME = VIDEO_NAME
         self.__get_center_point(result)
         self.__get_difference_from_the_center_point()
@@ -99,4 +101,6 @@ class Calc():
         self.__get_azimuth_angle()
         self.__calc_distance()
         self.draw_marker(result)
+        self.t4 = time.time()
+        self.calcT = self.t4-self.t3
         return self.distance, self.phi
